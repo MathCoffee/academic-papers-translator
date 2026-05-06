@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traductor de artículos académicos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape shape1"></div>
+        <div class="shape shape2"></div>
+        <div class="shape shape3"></div>
+    </div>
+
+    <div class="glass-container">
+        <header>
+            <h1>Traductor de Artículos Académicos</h1>
+            <p>Sube tu archivo PDF o Word para obtener una traducción fluida, manteniendo el formato y el rigor académico.</p>
+        </header>
+
+        <form id="upload-form" enctype="multipart/form-data">
+            <div class="input-group">
+                <label for="direction">Dirección de traducción:</label>
+                <div class="select-wrapper">
+                    <select name="direction" id="direction">
+                        <option value="en2es">Inglés a Español (México)</option>
+                        <option value="es2en">Español a Inglés</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="upload-zone" id="upload-zone">
+                <input type="file" name="file" id="file" accept=".pdf,.docx" required>
+                <div class="upload-content">
+                    <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p id="file-name-display">Arrastra tu archivo aquí o <strong>haz clic para seleccionar</strong></p>
+                    <span class="file-types">Formatos soportados: PDF, DOCX (Max 50MB)</span>
+                </div>
+            </div>
+
+            <button type="submit" id="submit-btn" class="glow-on-hover">
+                <span class="btn-text">Traducir Documento</span>
+            </button>
+        </form>
+
+        <div id="progress-container" class="hidden">
+            <h3 id="progress-status">Preparando...</h3>
+            <p id="progress-message" class="pulse">Iniciando tarea...</p>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+            <p class="warning-text">Nota: Las traducciones largas pueden tardar varios minutos debido al procesamiento párrafo por párrafo.</p>
+        </div>
+
+        <div id="result-container" class="hidden">
+            <h3>¡Traducción Completada!</h3>
+            <a id="download-btn" href="#" class="download-btn glow-on-hover">Descargar Archivo</a>
+            <button id="reset-btn" class="reset-btn">Traducir otro archivo</button>
+        </div>
+
+        <footer>
+            &copy; 2026 Tlacuache Codex Lab. Todos los derechos reservados.
+        </footer>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file');
+        const uploadZone = document.getElementById('upload-zone');
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const form = document.getElementById('upload-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+        const progressStatus = document.getElementById('progress-status');
+        const progressMessage = document.getElementById('progress-message');
+        const resultContainer = document.getElementById('result-container');
+        const downloadBtn = document.getElementById('download-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // Drag and drop effects
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileName();
+            }
+        });
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (fileInput.files.length > 0) {
+                fileNameDisplay.innerHTML = `Archivo seleccionado: <strong>${fileInput.files[0].name}</strong>`;
+                uploadZone.classList.add('has-file');
+            } else {
+                fileNameDisplay.innerHTML = `Arrastra tu archivo aquí o <strong>haz clic para seleccionar</strong>`;
+                uploadZone.classList.remove('has-file');
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!fileInput.files.length) return;
+
+            const formData = new FormData(form);
+            form.classList.add('hidden');
+            progressContainer.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    pollStatus(data.task_id);
+                } else {
+                    showError(data.error || "Error al subir el archivo.");
+                }
+            } catch (err) {
+                showError("Error de conexión.");
+            }
+        });
+
+        async function pollStatus(taskId) {
+            try {
+                const response = await fetch(`/status/${taskId}`);
+                const data = await response.json();
+                
+                if (data.status === 'processing') {
+                    progressFill.style.width = `${data.progress}%`;
+                    progressStatus.innerText = "Procesando...";
+                    progressMessage.innerText = data.message;
+                    setTimeout(() => pollStatus(taskId), 3000);
+                } else if (data.status === 'done') {
+                    progressFill.style.width = `100%`;
+                    progressStatus.innerText = "¡Finalizado!";
+                    progressMessage.innerText = data.message;
+                    setTimeout(() => {
+                        progressContainer.classList.add('hidden');
+                        resultContainer.classList.remove('hidden');
+                        downloadBtn.href = `/download/${taskId}`;
+                    }, 1000);
+                } else if (data.status === 'error') {
+                    showError(data.message);
+                }
+            } catch (err) {
+                showError("Error al consultar el estado de la traducción.");
+            }
+        }
+
+        function showError(msg) {
+            progressStatus.innerText = "Ocurrió un error";
+            progressStatus.style.color = "#ff6b6b";
+            progressMessage.innerText = msg;
+            progressMessage.classList.remove('pulse');
+            progressFill.style.backgroundColor = "#ff6b6b";
+        }
+
+        resetBtn.addEventListener('click', () => {
+            form.reset();
+            updateFileName();
+            resultContainer.classList.add('hidden');
+            progressContainer.classList.add('hidden');
+            form.classList.remove('hidden');
+            progressFill.style.width = '0%';
+            progressFill.style.backgroundColor = 'var(--accent)';
+            progressStatus.style.color = '';
+        });
+
+    </script>
+</body>
+</html>

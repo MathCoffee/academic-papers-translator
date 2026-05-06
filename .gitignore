@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+tasks/
+uploads/
+*.docx
+*.pdf
+!Revision May 4 2026 Boistrup, Abtahi, Fran, Fred, Carrillo-Catalán.docx
+!Yasmine-Abtahi-In-the-Teaching-of-Mathematics-Part-of-Ethical-Responsibility-is-Toward-a-Shared-Sense-of-Solidarity-and-Commitment.pdf
+.DS_Store
