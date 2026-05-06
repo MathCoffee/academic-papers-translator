@@ -167,9 +167,13 @@
                         progressContainer.classList.add('hidden');
                         resultContainer.classList.remove('hidden');
                         downloadBtn.href = `/download/${taskId}`;
+                        // Auto-descargar inmediatamente para evitar que Render borre el archivo temporal
+                        window.location.href = `/download/${taskId}`;
                     }, 1000);
                 } else if (data.status === 'error') {
                     showError(data.message);
+                } else if (data.status === 'not_found') {
+                    showError("La tarea se perdió (el servidor se reinició). Por favor vuelve a intentarlo.");
                 }
             } catch (err) {
                 showError("Error al consultar el estado de la traducción.");
