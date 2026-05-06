@@ -30,6 +30,16 @@
                     </select>
                 </div>
             </div>
+            
+            <div class="input-group">
+                <label for="mode">Modo de traducción:</label>
+                <div class="select-wrapper">
+                    <select name="mode" id="mode">
+                        <option value="paragraph">Párrafo por párrafo (Más segura)</option>
+                        <option value="batch">Traducción por lotes (Más rápida)</option>
+                    </select>
+                </div>
+            </div>
 
             <div class="upload-zone" id="upload-zone">
                 <input type="file" name="file" id="file" accept=".pdf,.docx" required>
@@ -60,6 +70,10 @@
             <h3>¡Traducción Completada!</h3>
             <a id="download-btn" href="#" class="download-btn glow-on-hover">Descargar Archivo</a>
             <button id="reset-btn" class="reset-btn">Traducir otro archivo</button>
+        </div>
+
+        <div class="disclaimer">
+            <p><strong>Aviso:</strong> La traducción es generada por IA y puede contener imprecisiones. El texto enviado podría ser utilizado por Google para entrenar sus modelos de IA.</p>
         </div>
 
         <footer>

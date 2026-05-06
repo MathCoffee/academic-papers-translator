@@ -290,6 +290,20 @@ header p {
     color: white;
 }
 
+.disclaimer {
+    margin-top: 1.5rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.disclaimer strong {
+    color: #fcd34d;
+}
+
 footer {
     margin-top: 2rem;
     font-size: 0.8rem;

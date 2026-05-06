@@ -71,7 +71,55 @@ def translate_text(client, text, direction="en2es", retries=3):
                 
     return text # return original if failed all retries
 
-def process_docx(docx_path, output_path, client, direction="en2es", task_id=None):
+def translate_batch_text(client, texts, direction="en2es", retries=3):
+    if not texts:
+        return []
+        
+    delimiter = "\n\n|||\n\n"
+    combined_text = delimiter.join(texts)
+    
+    if direction == "en2es":
+        prompt = (
+            "Translate the following text segments from academic English to academic Mexican Spanish. "
+            "The context is strictly 'Mathematics Education' (Educación Matemática). "
+            "Maintain the academic style, flow, and exact meaning. "
+            "IMPORTANT: The text contains multiple distinct segments separated by '|||'. "
+            "You MUST separate your translations with the exact same '|||' delimiter. "
+            "Provide ONLY the translated text segments:\n\n"
+        )
+    else:
+        prompt = (
+            "Translate the following text segments from academic Spanish to academic English. "
+            "The context is strictly 'Mathematics Education' (Educación Matemática). "
+            "Maintain the academic style, flow, and exact meaning. "
+            "IMPORTANT: The text contains multiple distinct segments separated by '|||'. "
+            "You MUST separate your translations with the exact same '|||' delimiter. "
+            "Provide ONLY the translated text segments:\n\n"
+        )
+        
+    full_prompt = prompt + combined_text
+
+    for attempt in range(retries):
+        try:
+            time.sleep(4.1)
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=full_prompt,
+            )
+            translated_combined = response.text.strip()
+            translated_segments = [s.strip() for s in translated_combined.split('|||')]
+            return translated_segments
+        except Exception as e:
+            err_msg = str(e)
+            print(f"Warning: Failed to translate batch on attempt {attempt+1}: {err_msg[:100]}...")
+            if '429' in err_msg or 'RESOURCE_EXHAUSTED' in err_msg or '503' in err_msg or 'UNAVAILABLE' in err_msg:
+                time.sleep(20)
+            else:
+                time.sleep(10)
+                
+    return texts
+
+def process_docx(docx_path, output_path, client, direction="en2es", task_id=None, mode="paragraph"):
     print(f"Opening DOCX '{docx_path}' for translation...")
     try:
         doc = docx.Document(docx_path)
@@ -81,21 +129,36 @@ def process_docx(docx_path, output_path, client, direction="en2es", task_id=None
         sys.exit(1)
 
     print("Translating paragraphs...")
-    total_paras = len(doc.paragraphs)
-    for i, para in enumerate(doc.paragraphs):
-        text = para.text.strip()
-        if text:
-            # We preserve the paragraph style but replace its text
-            # This loses inline formatting but preserves the paragraph as a whole
-            translated_text = translate_text(client, text, direction)
+    valid_paras = [p for p in doc.paragraphs if p.text.strip()]
+    total_paras = len(valid_paras)
+    
+    if mode == "batch":
+        batch_size = 5
+        for i in range(0, total_paras, batch_size):
+            chunk = valid_paras[i:i+batch_size]
+            texts = [p.text.strip() for p in chunk]
+            
+            translated_texts = translate_batch_text(client, texts, direction)
+            
+            if len(translated_texts) == len(chunk):
+                for j, para in enumerate(chunk):
+                    para.text = translated_texts[j]
+            else:
+                print(f"Batch mismatch (expected {len(chunk)}, got {len(translated_texts)}). Falling back to singular translation for this batch.")
+                for para in chunk:
+                    para.text = translate_text(client, para.text.strip(), direction)
+                    
+            if task_id:
+                prog = 40 + int((min(i + batch_size, total_paras) / total_paras) * 50)
+                update_progress(task_id, "processing", prog, f"Traduciendo (por lotes) {min(i + batch_size, total_paras)} de {total_paras}...")
+    else:
+        for i, para in enumerate(valid_paras):
+            translated_text = translate_text(client, para.text.strip(), direction)
             para.text = translated_text
             
-            if i % 2 == 0:
-                print(f"Processed {i} paragraphs...")
-                if task_id: 
-                    # Map paragraph processing from 40% to 90% progress
-                    prog = 40 + int((i / total_paras) * 50)
-                    update_progress(task_id, "processing", prog, f"Traduciendo párrafo {i} de {total_paras}...")
+            if i % 2 == 0 and task_id:
+                prog = 40 + int((i / total_paras) * 50)
+                update_progress(task_id, "processing", prog, f"Traduciendo párrafo {i} de {total_paras}...")
 
     print("Translating tables...")
     for table in doc.tables:

@@ -21,7 +21,7 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024 # 50 MB limit
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs('tasks', exist_ok=True)
 
-def run_translation_task(task_id, input_path, direction, api_key):
+def run_translation_task(task_id, input_path, direction, api_key, mode="paragraph"):
     try:
         update_progress(task_id, "processing", 10, "Initializing Google Gemini Client...")
         client = genai.Client(api_key=api_key)
@@ -38,13 +38,13 @@ def run_translation_task(task_id, input_path, direction, api_key):
             
             update_progress(task_id, "processing", 40, "Translating document...")
             # We pass task_id to process_docx so it can update progress
-            process_docx(temp_docx_path, output_path, client, direction, task_id=task_id)
+            process_docx(temp_docx_path, output_path, client, direction, task_id=task_id, mode=mode)
             
             if os.path.exists(temp_docx_path):
                 os.remove(temp_docx_path)
         else:
             update_progress(task_id, "processing", 20, "Translating document...")
-            process_docx(input_path, output_path, client, direction, task_id=task_id)
+            process_docx(input_path, output_path, client, direction, task_id=task_id, mode=mode)
             
         update_progress(task_id, "done", 100, "Translation complete!", result_file=output_path)
         
@@ -62,6 +62,7 @@ def upload_file():
         
     file = request.files['file']
     direction = request.form.get('direction', 'en2es')
+    mode = request.form.get('mode', 'paragraph')
     
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
@@ -86,7 +87,7 @@ def upload_file():
         update_progress(task_id, "processing", 0, "Upload complete. Starting translation...")
         
         # Start background thread
-        thread = threading.Thread(target=run_translation_task, args=(task_id, input_path, direction, api_key))
+        thread = threading.Thread(target=run_translation_task, args=(task_id, input_path, direction, api_key, mode))
         thread.daemon = True
         thread.start()
         
